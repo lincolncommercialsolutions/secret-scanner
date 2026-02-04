@@ -22,7 +22,7 @@ from secret_scanner.github_scanner import GitHubScanner
 # Page configuration
 st.set_page_config(
     page_title="Secret Scanner",
-    page_icon="🔍",
+    page_icon="�",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -51,7 +51,7 @@ def load_default_config():
 
 def render_sidebar():
     """Render sidebar with configuration options."""
-    st.sidebar.title("⚙️ Configuration")
+    st.sidebar.title("Configuration")
     
     # Load config
     if st.session_state.config is None:
@@ -60,10 +60,10 @@ def render_sidebar():
     config = st.session_state.config
     
     if config:
-        st.sidebar.success(f"✓ {len(config.rules)} rules loaded")
+        st.sidebar.success(f"{len(config.rules)} rules loaded")
         
         # Show rule categories
-        with st.sidebar.expander("📋 Detection Rules", expanded=False):
+        with st.sidebar.expander("Detection Rules", expanded=False):
             rule_tags = {}
             for rule in config.rules:
                 tags = rule.get('tags', ['other'])
@@ -78,14 +78,14 @@ def render_sidebar():
         # Configuration warnings
         warnings = validate_config(config)
         if warnings:
-            with st.sidebar.expander("⚠️ Warnings", expanded=False):
+            with st.sidebar.expander("Warnings", expanded=False):
                 for warning in warnings:
                     st.warning(warning)
     
     st.sidebar.divider()
     
     # Scan options
-    st.sidebar.subheader("🔍 Scan Options")
+    st.sidebar.subheader("Scan Options")
     
     scan_mode = st.sidebar.radio(
         "Scan Mode",
@@ -140,10 +140,10 @@ def scan_path(path: str, git_history: bool = False, max_commits: int = None) -> 
 def render_findings_summary(findings: List[Finding]):
     """Render summary statistics of findings."""
     if not findings:
-        st.success("🎉 No secrets detected!")
+        st.success("No secrets detected!")
         return
     
-    st.error(f"⚠️ {len(findings)} secret(s) detected!")
+    st.error(f"WARNING: {len(findings)} secret(s) detected!")
     
     # Summary metrics
     col1, col2, col3, col4 = st.columns(4)
@@ -229,7 +229,7 @@ def render_findings_table(findings: List[Finding], show_entropy: bool = True):
     if not findings:
         return
     
-    st.subheader("📊 Detailed Findings")
+    st.subheader("Detailed Findings")
     
     # Convert findings to DataFrame
     data = []
@@ -298,7 +298,7 @@ def render_findings_table(findings: List[Finding], show_entropy: bool = True):
     )
     
     # Export options
-    st.subheader("💾 Export Results")
+    st.subheader("Export Results")
     
     col1, col2, col3 = st.columns(3)
     
@@ -361,12 +361,12 @@ def main():
     init_session_state()
     
     # Header
-    st.title("🔍 Secret Scanner")
+    st.title("Secret Scanner")
     st.markdown("**Production-grade secret detection for Git repositories and files**")
     
     # Sidebar
     scan_mode, max_commits, show_entropy = render_sidebar()
-    tab1, tab2, tab3, tab4 = st.tabs(["📂 Scan Local", "🐙 Scan GitHub", "📊 Results", "ℹ️ About"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Scan Local", "Scan GitHub", "Results", "About"])
     
     with tab1:
         st.header("Scan Local Files")
@@ -420,7 +420,7 @@ def main():
                     st.rerun()
     
     with tab2:
-        st.header("🐙 Scan GitHub Repositories")
+        st.header("Scan GitHub Repositories")
         
         # GitHub authentication (required)
         with st.expander("🔐 GitHub Authentication (Required)", expanded=True):
@@ -452,7 +452,7 @@ def main():
                 try:
                     gh_scanner = GitHubScanner(st.session_state.config, github_token)
                     auth_user = gh_scanner.github.get_user()
-                    st.success(f"✓ Authenticated as: **{auth_user.login}** ({auth_user.name or 'No name'})")
+                    st.success(f"Authenticated as: **{auth_user.login}** ({auth_user.name or 'No name'})")
                     
                     # Show rate limit
                     rate_limit = gh_scanner.get_rate_limit()
@@ -462,10 +462,10 @@ def main():
                     with col2:
                         st.metric("Search Requests Remaining", rate_limit['search']['remaining'])
                 except Exception as e:
-                    st.error(f"❌ Authentication failed: {e}")
+                    st.error(f"Authentication failed: {e}")
                     st.info("Please verify your token is valid and has the correct scopes.")
             else:
-                st.warning("⚠️ Please enter your Personal Access Token to proceed.")
+                st.warning("Please enter your Personal Access Token to proceed.")
         
         # Scan mode
         github_scan_mode = st.radio(
@@ -487,9 +487,9 @@ def main():
                 help="Scan commit history for secrets (slower)"
             )
             
-            if st.button("🔍 Scan Repository", type="primary", use_container_width=True):
+            if st.button("Scan Repository", type="primary", use_container_width=True):
                 if not github_token:
-                    st.error("❌ Please authenticate with your GitHub token first (see settings above)")
+                    st.error("Please authenticate with your GitHub token first (see settings above)")
                 elif repo_input:
                     try:
                         gh_scanner = GitHubScanner(st.session_state.config, github_token)
@@ -500,7 +500,7 @@ def main():
                                 max_commits=max_commits
                             )
                         
-                        st.success(f"✓ Scanned {result['repo_name']}")
+                        st.success(f"Scanned {result['repo_name']}")
                         st.session_state.scan_results = result['findings']
                         
                         # Show repo info
@@ -567,9 +567,9 @@ def main():
                 help="Limit number of repositories to scan"
             )
             
-            if st.button("🔍 Scan User Repos", type="primary", use_container_width=True):
+            if st.button("Scan User Repos", type="primary", use_container_width=True):
                 if not github_token:
-                    st.error("❌ Please authenticate with your GitHub token first (see settings above)")
+                    st.error("Please authenticate with your GitHub token first (see settings above)")
                 elif username:
                     try:
                         gh_scanner = GitHubScanner(st.session_state.config, github_token)
@@ -588,20 +588,20 @@ def main():
                         st.session_state.scan_results = all_findings
                         st.session_state.repo_results = results  # Store individual repo results
                         
-                        st.success(f"✓ Scanned {len(results)} repositories")
+                        st.success(f"Scanned {len(results)} repositories")
                         
                         # Show individual repository results
-                        st.subheader("📦 Repository Scan Results")
+                        st.subheader("Repository Scan Results")
                         total_secrets = 0
                         for idx, result in enumerate(results, 1):
                             with st.expander(f"{idx}. {result['repo_name']} - {result['total_findings']} findings", expanded=result['total_findings'] > 0):
                                 col1, col2, col3 = st.columns(3)
                                 with col1:
-                                    st.metric("⭐ Stars", result['stars'])
+                                    st.metric("Stars", result['stars'])
                                 with col2:
-                                    st.metric("💻 Language", result['language'] or "N/A")
+                                    st.metric("Language", result['language'] or "N/A")
                                 with col3:
-                                    st.metric("🔍 Findings", result['total_findings'])
+                                    st.metric("Findings", result['total_findings'])
                                 
                                 if result['findings']:
                                     st.warning(f"Found {result['total_findings']} potential secrets in this repository")
@@ -610,16 +610,16 @@ def main():
                                     if len(result['findings']) > 5:
                                         st.caption(f"... and {len(result['findings']) - 5} more findings")
                                 else:
-                                    st.success("✓ No secrets detected")
+                                    st.success("No secrets detected")
                             total_secrets += result['total_findings']
                         
                         st.divider()
-                        st.metric("📈 Total Secrets Found Across All Repos", total_secrets)
+                        st.metric("Total Secrets Found Across All Repos", total_secrets)
                         
                     except Exception as e:
                         st.error(f"Error: {e}")
                 else:
-                    st.error("❌ Please enter a GitHub username or click 'Use My Account' button above")
+                    st.error("Please enter a GitHub username or click 'Use My Account' button above")
         
         elif github_scan_mode == "Organization Repositories":
             org_name = st.text_input(
@@ -637,9 +637,9 @@ def main():
                 key="org_max_repos"
             )
             
-            if st.button("🔍 Scan Org Repos", type="primary", use_container_width=True):
+            if st.button("Scan Org Repos", type="primary", use_container_width=True):
                 if not github_token:
-                    st.error("❌ Please authenticate with your GitHub token first (see settings above)")
+                    st.error("Please authenticate with your GitHub token first (see settings above)")
                 elif org_name:
                     try:
                         gh_scanner = GitHubScanner(st.session_state.config, github_token)
@@ -658,20 +658,20 @@ def main():
                         st.session_state.scan_results = all_findings
                         st.session_state.repo_results = results  # Store individual repo results
                         
-                        st.success(f"✓ Scanned {len(results)} repositories")
+                        st.success(f"Scanned {len(results)} repositories")
                         
                         # Show individual repository results
-                        st.subheader("📦 Repository Scan Results")
+                        st.subheader("Repository Scan Results")
                         total_secrets = 0
                         for idx, result in enumerate(results, 1):
                             with st.expander(f"{idx}. {result['repo_name']} - {result['total_findings']} findings", expanded=result['total_findings'] > 0):
                                 col1, col2, col3 = st.columns(3)
                                 with col1:
-                                    st.metric("⭐ Stars", result['stars'])
+                                    st.metric("Stars", result['stars'])
                                 with col2:
-                                    st.metric("💻 Language", result['language'] or "N/A")
+                                    st.metric("Language", result['language'] or "N/A")
                                 with col3:
-                                    st.metric("🔍 Findings", result['total_findings'])
+                                    st.metric("Findings", result['total_findings'])
                                 
                                 if result['findings']:
                                     st.warning(f"Found {result['total_findings']} potential secrets in this repository")
@@ -680,11 +680,11 @@ def main():
                                     if len(result['findings']) > 5:
                                         st.caption(f"... and {len(result['findings']) - 5} more findings")
                                 else:
-                                    st.success("✓ No secrets detected")
+                                    st.success("No secrets detected")
                             total_secrets += result['total_findings']
                         
                         st.divider()
-                        st.metric("📈 Total Secrets Found Across All Repos", total_secrets)
+                        st.metric("Total Secrets Found Across All Repos", total_secrets)
                         
                     except Exception as e:
                         st.error(f"Error: {e}")
@@ -707,9 +707,9 @@ def main():
                 key="search_max_repos"
             )
             
-            if st.button("🔍 Search & Scan", type="primary", use_container_width=True):
+            if st.button("Search & Scan", type="primary", use_container_width=True):
                 if not github_token:
-                    st.error("❌ Please authenticate with your GitHub token first (see settings above)")
+                    st.error("Please authenticate with your GitHub token first (see settings above)")
                 elif search_query:
                     try:
                         gh_scanner = GitHubScanner(st.session_state.config, github_token)
@@ -728,20 +728,20 @@ def main():
                         st.session_state.scan_results = all_findings
                         st.session_state.repo_results = results  # Store individual repo results
                         
-                        st.success(f"✓ Scanned {len(results)} repositories")
+                        st.success(f"Scanned {len(results)} repositories")
                         
                         # Show individual repository results
-                        st.subheader("📦 Repository Scan Results")
+                        st.subheader("Repository Scan Results")
                         total_secrets = 0
                         for idx, result in enumerate(results, 1):
                             with st.expander(f"{idx}. {result['repo_name']} - {result['total_findings']} findings", expanded=result['total_findings'] > 0):
                                 col1, col2, col3 = st.columns(3)
                                 with col1:
-                                    st.metric("⭐ Stars", result['stars'])
+                                    st.metric("Stars", result['stars'])
                                 with col2:
-                                    st.metric("💻 Language", result['language'] or "N/A")
+                                    st.metric("Language", result['language'] or "N/A")
                                 with col3:
-                                    st.metric("🔍 Findings", result['total_findings'])
+                                    st.metric("Findings", result['total_findings'])
                                 
                                 if result['findings']:
                                     st.warning(f"Found {result['total_findings']} potential secrets in this repository")
@@ -750,11 +750,11 @@ def main():
                                     if len(result['findings']) > 5:
                                         st.caption(f"... and {len(result['findings']) - 5} more findings")
                                 else:
-                                    st.success("✓ No secrets detected")
+                                    st.success("No secrets detected")
                             total_secrets += result['total_findings']
                         
                         st.divider()
-                        st.metric("📈 Total Secrets Found Across All Repos", total_secrets)
+                        st.metric("Total Secrets Found Across All Repos", total_secrets)
                         
                     except Exception as e:
                         st.error(f"Error: {e}")
@@ -774,7 +774,7 @@ def main():
                 st.divider()
                 
                 # Charts
-                st.subheader("📈 Visualization")
+                st.subheader("Visualization")
                 render_findings_charts(findings)
                 
                 st.divider()
@@ -789,13 +789,13 @@ def main():
         
         st.markdown("""
         ### Features
-        - 🔍 **30+ Detection Rules** - AWS, GitHub, Stripe, API keys, and more
-        - 🎲 **Shannon Entropy Analysis** - Detect high-randomness secrets
-        - 📜 **Git History Scanning** - Find secrets in commit history
-        - 🐙 **GitHub Integration** - Scan public repositories directly
-        - 🎨 **Interactive UI** - Easy-to-use web interface
-        - 📊 **Visualizations** - Charts and graphs for analysis
-        - 💾 **Export Options** - JSON, CSV, Markdown reports
+        - **30+ Detection Rules** - AWS, GitHub, Stripe, API keys, and more
+        - **Shannon Entropy Analysis** - Detect high-randomness secrets
+        - **Git History Scanning** - Find secrets in commit history
+        - **GitHub Integration** - Scan public repositories directly
+        - **Interactive UI** - Easy-to-use web interface
+        - **Visualizations** - Charts and graphs for analysis
+        - **Export Options** - JSON, CSV, Markdown reports
         
         ### Detection Categories
         - Cloud Credentials (AWS, Google Cloud, Azure)
@@ -840,7 +840,7 @@ def main():
             st.metric("Exclusions", len(st.session_state.config.exclusions) if st.session_state.config else "N/A")
         
         with col3:
-            st.metric("Status", "✅ Ready")
+            st.metric("Status", "Ready")
 
 
 if __name__ == "__main__":

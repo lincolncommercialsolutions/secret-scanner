@@ -6,17 +6,17 @@ A production-grade CLI tool for detecting secrets and sensitive information in G
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-## ✨ Key Features
+## Key Features
 
-- 🔍 **30+ Detection Rules** - AWS keys, GitHub tokens, API keys, database credentials, private keys, and more
-- 🎲 **Shannon Entropy Analysis** - Detect high-entropy strings that look like secrets
-- 📜 **Git History Scanning** - Find secrets introduced in past commits
-- 🐙 **GitHub Integration** - Scan public repositories, users, organizations, or search results
-- 🎨 **Multiple Output Formats** - Console (colorized), JSON, SARIF, Summary
-- 🖥️ **Web UI** - Beautiful Streamlit interface for interactive scanning
-- ⚙️ **Configurable Rules** - YAML-based configuration for easy customization
-- 🚫 **Smart Filtering** - False positive reduction with entropy thresholds and path exclusions
-- 🔌 **CI/CD Ready** - Git hooks, GitHub Actions, GitLab CI integration examples
+- **30+ Detection Rules** - AWS keys, GitHub tokens, API keys, database credentials, private keys, and more
+- **Shannon Entropy Analysis** - Detect high-entropy strings that look like secrets
+- **Git History Scanning** - Find secrets introduced in past commits
+- **GitHub Integration** - Scan public repositories, users, organizations, or search results
+- **Multiple Output Formats** - Console (colorized), JSON, SARIF, Summary
+- **Web UI** - Beautiful Streamlit interface for interactive scanning
+- **Configurable Rules** - YAML-based configuration for easy customization
+- **Smart Filtering** - False positive reduction with entropy thresholds and path exclusions
+- **CI/CD Ready** - Git hooks, GitHub Actions, GitLab CI integration examples
 
 ## Installation
 
@@ -67,7 +67,21 @@ secret-scanner scan file1.py file2.js
 secret-scanner scan --rules custom_rules.yaml /path/to/project
 ```
 
-## 🐙 GitHub Scanning
+## Streamlit Cloud Deployment
+
+The app is deployed on Streamlit Cloud:
+- **Main file path**: `src/secret_scanner/ui.py`
+- **Live URL**: [Your Streamlit App URL]
+- **Auto-deploys** from main branch on GitHub
+
+To deploy your own instance:
+1. Fork this repository
+2. Go to [share.streamlit.io](https://share.streamlit.io)
+3. Connect your GitHub account
+4. Select your repository and set main file path to `src/secret_scanner/ui.py`
+5. Click Deploy
+
+## GitHub Scanning
 
 Scan public GitHub repositories directly:
 
