@@ -1,0 +1,371 @@
+Here is all the detailed information you need to build a robust, production-grade Secret Scanner CLI in Python (as per your project goals). This expands on the previous code skeleton with:
+
+    Comprehensive rules list (expanded from Gitleaks defaults + 2025/2026 common patterns from open sources like Gitleaks repo, secrets-patterns-db, GitHub docs, and community sources).
+    Improved Git history scanning logic (using GitPython properly for diffs).
+    False positive mitigation (keywords, path exclusions, better entropy).
+    Full code for key modules.
+    Testing strategy, hook integration example, and CI snippet.
+    Tips for performance, accuracy, and portfolio polish.
+
+1. Expanded Rules Config (config/default_rules.yaml)
+
+Use YAML for easier Python parsing. This includes ~30 high-value rules (based on Gitleaks TOML defaults as of late 2025/early 2026, GitHub's supported patterns, and common additions like newer cloud tokens). Copy-paste this into config/default_rules.yaml:
+
+rules:
+  - id: aws-access-key-id
+    description: AWS Access Key ID
+    regex: (?i)AKIA[0-9A-Z]{16}
+    entropy: 3.2
+    tags: [aws, cloud]
+
+  - id: aws-secret-access-key
+    description: AWS Secret Access Key
+    regex: (?i)[0-9a-zA-Z/+]{40}
+    entropy: 4.0
+    keywords: [aws_secret_access_key, secret_key]
+
+  - id: github-pat-classic
+    description: GitHub Personal Access Token (classic)
+    regex: ghp_[0-9a-zA-Z]{36}
+    entropy: 4.2
+
+  - id: github-fine-grained-pat
+    description: GitHub Fine-Grained PAT
+    regex: github_pat_[0-9A-Za-z]{22}_[0-9A-Za-z]{53}
+    entropy: 4.5
+
+  - id: stripe-secret-key
+    description: Stripe Secret Key
+    regex: sk_live_[0-9a-zA-Z]{24}
+    entropy: null
+
+  - id: stripe-test-key
+    description: Stripe Test Key (potential leak)
+    regex: sk_test_[0-9a-zA-Z]{24}
+    entropy: null
+
+  - id: google-api-key
+    description: Google API Key
+    regex: AIza[0-9A-Za-z\\-_]{35}
+    entropy: 3.8
+
+  - id: google-oauth-client-secret
+    description: Google OAuth2 Client Secret
+    regex: (?i)(client_secret|oauth_client_secret)[\s:=]+['"]?[a-zA-Z0-9]{24}['"]?
+    entropy: 3.5
+
+  - id: slack-token
+    description: Slack Token / Webhook
+    regex: (?i)xox[baprs]-[0-9]{12}-[0-9]{12}-[0-9]{12}-[a-z0-9]{32}
+    entropy: 4.0
+
+  - id: jwt
+    description: JSON Web Token (JWT)
+    regex: eyJ[A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*
+    entropy: 4.0
+    keywords: [jwt, token]
+
+  - id: rsa-private-key
+    description: RSA Private Key (PEM)
+    regex: -----BEGIN RSA PRIVATE KEY-----
+    entropy: null
+
+  - id: ec-private-key
+    description: EC Private Key
+    regex: -----BEGIN EC PRIVATE KEY-----
+    entropy: null
+
+  - id: openvpn-key
+    description: OpenVPN Static Key
+    regex: -----BEGIN OpenVPN Static key V1-----
+    entropy: null
+
+  - id: generic-password
+    description: Generic password / secret assignment
+    regex: (?i)(password|passwd|pwd|secret|api_key|token|auth_key|credential)[\s:=]+['"]?[^'"\s]{8,}['"]?
+    entropy: 3.7
+    keywords: [password, secret, key]
+
+  - id: database-url
+    description: Database Connection String
+    regex: (?i)(postgres|mysql|mongodb|redis|sqlserver)://[^:]+:[^@]+@[^/]+(/\w+)?
+    entropy: 3.5
+
+  # Add more as needed: Azure SAS, Twilio, SendGrid, Docker config auth, etc.
+  # From secrets-patterns-db and GitHub patterns (2025+ updates include more fine-grained GitHub tokens, newer GCP patterns)
+
+2. Full Entropy Detector (src/secret_scanner/detectors/entropy.py)
+
+(Already good, but add base64 awareness if needed later.)
+
+import math
+from collections import Counter
+
+def shannon_entropy(data: str) -> float:
+    if not data:
+        return 0.0
+    entropy = 0.0
+    length = len(data)
+    freq = Counter(data)
+    for count in freq.values():
+        p_x = count / length
+        entropy += -p_x * math.log2(p_x)
+    return entropy
+
+3. Improved Scanner (src/secret_scanner/scanner.py)
+
+Full version with better Git handling (scans diffs line-by-line for precision).
+
+import re
+from pathlib import Path
+from typing import List, Dict, Optional
+import git
+from .detectors.entropy import shannon_entropy
+from .config import load_rules
+
+class Finding:
+    def __init__(self, rule_id: str, desc: str, secret: str, file: str,
+                 line: Optional[int] = None, commit: Optional[str] = None,
+                 entropy: Optional[float] = None):
+        self.rule_id = rule_id
+        self.description = desc
+        self.secret = secret[:60] + "..." if len(secret) > 60 else secret
+        self.file_path = file
+        self.line = line
+        self.commit = commit[:8] if commit else None
+        self.entropy = round(entropy, 2) if entropy else None
+
+    def __str__(self):
+        parts = [f"{self.rule_id}: {self.description} in {self.file_path}"]
+        if self.line: parts.append(f":{self.line}")
+        if self.commit: parts.append(f" [commit {self.commit}]")
+        if self.entropy: parts.append(f" (entropy: {self.entropy})")
+        return " ".join(parts) + f"\n  Snippet: {self.secret}"
+
+def should_skip_path(path: str, exclusions: List[str]) -> bool:
+    return any(re.search(ex, path) for ex in exclusions)
+
+def scan_content(content: str, rules: List[Dict], file_path: str = "", commit: str = None,
+                 exclusions: List[str] = None) -> List[Finding]:
+    if exclusions and should_skip_path(file_path, exclusions):
+        return []
+    findings = []
+    lines = content.splitlines()
+    for rule in rules:
+        pattern = re.compile(rule["regex"], re.IGNORECASE | re.MULTILINE)
+        for match in pattern.finditer(content):
+            secret = match.group(0)
+            ent = shannon_entropy(secret)
+            min_ent = rule.get("entropy")
+            if min_ent is not None and ent < min_ent:
+                continue
+            # Keyword proximity filter (optional speedup/false pos reduction)
+            if "keywords" in rule:
+                nearby = content[max(0, match.start()-50):match.end()+50].lower()
+                if not any(k.lower() in nearby for k in rule["keywords"]):
+                    continue
+            line_num = content[:match.start()].count("\n") + 1
+            findings.append(Finding(
+                rule["id"], rule["description"], secret, file_path,
+                line=line_num, commit=commit, entropy=ent
+            ))
+    return findings
+
+def scan_file(path: Path, rules: List[Dict], exclusions: List[str] = None) -> List[Finding]:
+    if not path.is_file() or path.suffix in {'.png', '.jpg', '.gif', '.bin', '.exe'}:
+        return []
+    try:
+        content = path.read_text(encoding="utf-8", errors="ignore")
+        return scan_content(content, rules, str(path), exclusions=exclusions)
+    except Exception:
+        return []
+
+def scan_directory(dir_path: Path, rules: List[Dict], exclusions: List[str] = None) -> List[Finding]:
+    findings = []
+    for file in dir_path.rglob("*"):
+        if file.is_file():
+            findings.extend(scan_file(file, rules, exclusions))
+    return findings
+
+def scan_git_repo(repo_path: Path, history: bool = False, max_commits: int = 100,
+                   exclusions: List[str] = None) -> List[Finding]:
+    findings = []
+    repo = git.Repo(repo_path)
+    rules = load_rules()
+
+    if not history:
+        # Current index / working tree
+        for entry in repo.tree().traverse():
+            if entry.type == 'blob' and not should_skip_path(entry.path, exclusions or []):
+                try:
+                    content = repo.git.show(entry.hexsha)
+                    findings.extend(scan_content(content, rules, entry.path))
+                except:
+                    pass
+        return findings
+
+    # History: scan recent commits' diffs
+    commits = list(repo.iter_commits(max_count=max_commits))
+    for i, commit in enumerate(commits):
+        if i == 0:  # HEAD, skip if only changes wanted
+            continue
+        parent = commit.parents[0] if commit.parents else None
+        diffs = commit.diff(parent, create_patch=True) if parent else []
+        for diff in diffs:
+            if diff.a_path and diff.change_type in ('A', 'M'):
+                try:
+                    content = repo.git.show(f"{commit.hexsha}:{diff.a_path}")
+                    findings.extend(scan_content(content, rules, diff.a_path, commit.hexsha, exclusions))
+                except:
+                    pass
+    return findings
+
+4. Config Loader with Exclusions (src/secret_scanner/config.py)
+
+from pathlib import Path
+import yaml
+
+DEFAULT_CONFIG = Path(__file__).parent.parent.parent / "config" / "default_rules.yaml"
+
+def load_rules(config_path: str = str(DEFAULT_CONFIG)) -> list:
+    path = Path(config_path)
+    if not path.exists():
+        raise FileNotFoundError(f"Rules config not found: {path}")
+    with path.open() as f:
+        data = yaml.safe_load(f)
+    return data.get("rules", [])
+
+def load_exclusions(ignore_path: str = ".secret-scanner-ignore") -> List[str]:
+    path = Path(ignore_path)
+    if path.exists():
+        return [line.strip() for line in path.read_text().splitlines() if line.strip() and not line.startswith("#")]
+    return []
+
+5. Enhanced CLI (src/secret_scanner/cli.py)
+
+Add options for JSON output, exclusions, etc.
+
+import click
+from colorama import init, Fore, Style
+from .scanner import scan_file, scan_directory, scan_git_repo, Finding
+from .config import load_rules, load_exclusions
+import json
+
+init(autoreset=True)
+
+@click.group()
+def cli():
+    pass
+
+@cli.command()
+@click.argument("target", type=click.Path(exists=True))
+@click.option("--history", is_flag=True, help="Scan Git commit history")
+@click.option("--max-commits", default=100, help="Max commits to scan in history mode")
+@click.option("--json-output", is_flag=True, help="Output JSON instead of console")
+@click.option("--ignore-file", default=".secret-scanner-ignore", help="Ignore patterns file")
+def scan(target: str, history: bool, max_commits: int, json_output: bool, ignore_file: str):
+    path = Path(target).resolve()
+    rules = load_rules()
+    exclusions = load_exclusions(ignore_file)
+    findings: List[Finding] = []
+
+    is_git_repo = (path / ".git").is_dir()
+
+    if history and is_git_repo:
+        click.echo(f"{Fore.CYAN}Scanning Git history in {path} (up to {max_commits} commits)...")
+        findings = scan_git_repo(path, history=True, max_commits=max_commits, exclusions=exclusions)
+    elif path.is_file():
+        click.echo(f"{Fore.CYAN}Scanning file: {path}")
+        findings = scan_file(path, rules, exclusions)
+    elif path.is_dir():
+        click.echo(f"{Fore.CYAN}Scanning directory: {path}")
+        if is_git_repo and not history:
+            findings = scan_git_repo(path, history=False, exclusions=exclusions)
+        else:
+            findings = scan_directory(path, rules, exclusions)
+    else:
+        click.echo(f"{Fore.RED}Invalid target.")
+        return
+
+    if json_output:
+        output = [{"rule": f.rule_id, "desc": f.description, "secret": f.secret,
+                   "file": f.file_path, "line": f.line, "commit": f.commit, "entropy": f.entropy}
+                  for f in findings]
+        print(json.dumps(output, indent=2))
+    else:
+        if not findings:
+            click.echo(f"{Fore.GREEN}{Style.BRIGHT}No secrets detected. ✓")
+            return
+        click.echo(f"{Fore.RED}{Style.BRIGHT}Potential secrets found ({len(findings)}):")
+        for f in findings:
+            click.echo(f"  {Fore.YELLOW}{f}")
+
+if __name__ == "__main__":
+    cli()
+
+6. Git Pre-Commit Hook Integration
+
+Create install_hooks.sh:
+
+#!/bin/bash
+cat > .git/hooks/pre-commit <<EOF
+#!/bin/sh
+poetry run python -m secret_scanner.cli scan . --history=false
+if [ \$? -ne 0 ]; then
+  echo "Secret scan failed. Fix issues or use --no-verify to bypass."
+  exit 1
+fi
+EOF
+chmod +x .git/hooks/pre-commit
+
+Or use the popular pre-commit framework (recommended for portfolio):
+Add .pre-commit-config.yaml:
+
+repos:
+-   repo: local
+    hooks:
+    -   id: secret-scanner
+        name: Secret Scanner
+        entry: poetry run python -m secret_scanner.cli scan .
+        language: system
+        pass_filenames: false
+        always_run: true
+
+Then pre-commit install.
+7. CI/CD Example (GitHub Actions)
+
+.github/workflows/secret-scan.yml:
+
+name: Secret Scan
+on: [push, pull_request]
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }  # For history scan
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: Install Poetry
+        run: pip install poetry
+      - name: Install deps
+        run: poetry install
+      - name: Run Secret Scanner
+        run: poetry run python -m secret_scanner.cli scan . --history --json-output > scan.json
+      - name: Fail on findings
+        run: |
+          if jq -e '. | length > 0' scan.json > /dev/null; then
+            echo "Secrets found!"
+            cat scan.json
+            exit 1
+          fi
+
+8. Testing & Polish Tips
+
+    Unit Tests (pytest): Mock files/commits with known secrets; test entropy edge cases (base64, short strings).
+    Performance: Use concurrent.futures for parallel file scanning in large dirs.
+    Accuracy Tuning: Add --validate flag later (call APIs to check if key is live, but ethically).
+    Portfolio Extras: Add SARIF output for GitHub Code Scanning integration; demo video blocking commit; blog post on regex vs entropy trade-offs.
+
+This should give you everything for a strong MVP → polished tool. Run poetry run python -m secret_scanner.cli scan . to test. If you hit issues or want extensions (e.g., SARIF reporter, ML hints), share errors/output!

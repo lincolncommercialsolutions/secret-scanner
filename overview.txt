@@ -1,0 +1,136 @@
+Complex Development Plan
+This plan is divided into phases with timelines (assuming a 4-6 week solo project; adjust for team size). Each phase includes objectives, tasks, tools/resources, potential challenges, and milestones. We'll incorporate agile-like iterations for refinement.
+Phase 1: Research and Requirements Gathering (Week 1)
+Objective: Define scope, gather patterns, and benchmark against tools like Gitleaks/GitGuardian to avoid reinventing the wheel while adding unique features (e.g., custom entropy thresholds).
+
+Task 1.1: Analyze Existing Tools
+Install and test Gitleaks, TruffleHog, and GitGuardian on sample repos.
+Identify gaps: e.g., Gitleaks is fast but regex-heavy; add entropy for better detection of non-patterned secrets.
+Research common secret types: API keys (AWS, Google, Stripe), passwords, SSH keys, JWTs, certificates.
+Compile a list of 50+ regex patterns from sources like Gitleaks' config or detect-secrets library.
+
+Task 1.2: Define Functional and Non-Functional Requirements
+Functional: Scan modes (file/dir, Git history), ignore lists (.gitignore-style), report generation, dry-run mode.
+Non-Functional: Performance (scan 10k commits in <5 min), accuracy (low false positives via entropy >4.0 bits/char), security (no logging of detected secrets).
+User Stories: "As a developer, I want to scan my repo before push to prevent leaks." "As a SecOps engineer, I want CI integration for automated scans."
+
+Task 1.3: Tech Stack Finalization
+Core: Python 3.10+, GitPython for Git interactions, re for regex, math/shannon for entropy (custom function or use 'pwgen' inspired calc).
+Libraries: Click or Argparse for CLI, PyYAML for config files, Pytest for testing.
+Alternatives: If Go, use go-git and regexp packages; benchmark Python vs. Go on a large repo like Linux kernel.
+
+Challenges: Overly broad patterns lead to false positives; mitigate with allowlists and context checks (e.g., skip if in comments).
+Milestone: Requirements document (Markdown) and initial regex pattern YAML file.
+Resources: OWASP Cheat Sheet on Secrets Management, GitHub repos of Gitleaks/TruffleHog.
+
+Phase 2: Design and Architecture (Week 1-2)
+Objective: Create a modular architecture for scalability (e.g., easy to add new patterns or scanners).
+
+Task 2.1: High-Level Design
+Components: CLI Parser → Scanner Engine (regex + entropy) → Git Integrator → Reporter.
+Data Flow: Input (path/repo) → Traverse files/commits → Apply detectors → Filter results → Output.
+UML Diagrams: Sketch class diagrams (e.g., Scanner class with detect_secrets method).
+
+Task 2.2: Detailed Detector Design
+Regex Module: Load patterns from config (e.g., r'AKIA[0-9A-Z]{16}' for AWS keys).
+Entropy Module: Calculate Shannon entropy; flag strings >32 chars with entropy >3.5 (adjustable threshold).
+Hybrid Detection: Regex match OR high entropy + keyword proximity (e.g., near "password=").
+False Positive Reduction: Skip binary files, use context (e.g., ignore if in .env.example), allow user-defined exclusions.
+
+Task 2.3: Integration Design
+Git Hooks: Pre-commit script to run scanner.
+CI: GitHub Actions workflow YAML to scan on push/PR.
+Extensibility: Plugin system for custom detectors (e.g., via entry points).
+
+Challenges: Handling large Git histories without memory overload; use GitPython's iterative commit traversal.
+Milestone: Architecture diagram (use Draw.io) and prototype config file with 20+ patterns.
+Resources: Python Design Patterns book, GitPython docs.
+
+Phase 3: Core Development (Weeks 2-4)
+Objective: Build the MVP with iterative testing.
+
+Task 3.1: Setup Project Structure
+Init repo: Use Poetry for dependency management, structure as src/secret_scanner/, tests/, configs/.
+CLI Skeleton: Use Click for commands like scan file <path>, scan git <repo> --history.
+
+Task 3.2: Implement Scanner Engine
+File Scanner: Walk directory, read text files, apply regex/entropy.
+Git Scanner: Use GitPython to iterate commits, diff changes, scan added/modified lines.
+Parallelization: Use multiprocessing for large scans to improve speed (target <1s per file).
+
+Task 3.3: Reporting and Output
+Formats: Console (colored output), JSON for CI parsing, HTML report for portfolio demo.
+Include details: Secret type, location (file/line/commit), confidence score (e.g., based on entropy).
+
+Task 3.4: Iterations
+Iteration 1: Basic file scan with 10 patterns.
+Iteration 2: Add Git history scan.
+Iteration 3: Entropy checks and false positive filters.
+Daily commits with descriptive messages for portfolio.
+
+Challenges: Regex performance; optimize with compiled patterns. Git auth issues; handle via env vars.
+Milestone: Working MVP that scans a test repo and detects planted secrets.
+Resources: Click docs, Python multiprocessing guide.
+
+Phase 4: Testing and Quality Assurance (Week 4)
+Objective: Ensure reliability with comprehensive tests.
+
+Task 4.1: Unit Tests
+Test detectors: Mock files with known secrets, assert matches.
+Coverage: Aim for 80%+ with Pytest-cov.
+
+Task 4.2: Integration Tests
+End-to-end: Create temp Git repo, add secrets, scan, verify output.
+Edge Cases: Empty repo, binary files, large strings, Unicode.
+
+Task 4.3: Security and Performance Tests
+Fuzzing: Use Hypothesis to test regex on random inputs.
+Benchmark: Time scans on repos of varying sizes; optimize if >5 min.
+Security: Ensure no secrets are logged; use secure string handling.
+
+Challenges: False negatives; seed tests with real-world leak examples (anonymized).
+Milestone: 100% passing tests, coverage report.
+Resources: Pytest docs, Git test fixtures.
+
+Phase 5: Integrations and Enhancements (Weeks 4-5)
+Objective: Add polish for portfolio impact.
+
+Task 5.1: Git Hooks Integration
+Create install script: Add pre-commit hook via git config or pre-commit framework.
+Hook Logic: Run scan on staged files; block commit if secrets found (with bypass flag).
+
+Task 5.2: CI/CD Integration
+GitHub Actions: Workflow to scan on PR/push; fail build if issues.
+Other CI: Jenkins/GitLab examples in docs.
+Notifications: Integrate Slack/Email alerts via webhooks.
+
+Task 5.3: Advanced Features
+Configurability: User-editable YAML for patterns/thresholds.
+Remediation: Suggest commands to remove secrets (e.g., git filter-branch).
+Dashboard: Simple web UI (Flask) for scan results visualization.
+
+Challenges: CI compatibility across platforms; test on multiple OS (Linux/Mac/Win).
+Milestone: Demo video of hook blocking a commit and CI failing a PR.
+Resources: pre-commit framework, GitHub Actions docs.
+
+Phase 6: Documentation, Deployment, and Portfolio Presentation (Weeks 5-6)
+Objective: Package for sharing and highlight value.
+
+Task 6.1: Documentation
+README: Installation, usage, examples, contribution guide.
+API Docs: Use Sphinx if needed.
+Blog Post: Write about building process, lessons (e.g., entropy vs. regex trade-offs).
+
+Task 6.2: Deployment
+PyPI Package: Build with Poetry, upload.
+Docker Image: For easy CI runs.
+Open-Source: License (MIT), add GitHub stars workflow.
+
+Task 6.3: Portfolio Enhancements
+Metrics: Include breach stats, ROI (e.g., "Prevents $4.7M average breach cost").
+Demo: Video/screenshots of scans, integrations.
+Extensions: ML-based detection (future work with scikit-learn).
+
+Challenges: Clear, non-technical docs; use MkDocs for site.
+Milestone: Published repo, package, and presentation slide deck.
+Resources: PyPI tutorial, GitHub Pages.
