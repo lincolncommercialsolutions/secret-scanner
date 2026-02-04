@@ -360,9 +360,18 @@ def main():
     """Main UI function."""
     init_session_state()
     
-    # Header
-    st.title("Secret Scanner")
-    st.markdown("**Production-grade secret detection for Git repositories and files**")
+    # Header with logo
+    logo_path = Path(__file__).parent.parent.parent / "media" / "gitfih.png"
+    if logo_path.exists():
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            st.image(str(logo_path), width=150)
+        with col2:
+            st.title("Secret Scanner")
+            st.markdown("**Production-grade secret detection for Git repositories and files**")
+    else:
+        st.title("Secret Scanner")
+        st.markdown("**Production-grade secret detection for Git repositories and files**")
     
     # Sidebar
     scan_mode, max_commits, show_entropy = render_sidebar()
